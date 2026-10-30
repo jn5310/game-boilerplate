@@ -106,6 +106,12 @@ export class SceneManager {
     this.current?.onAppHidden();
   }
 
+  /** 뒤로가기 버튼 → 맨 위 씬의 onBack. 화면 전환 중에는 무시(처리한 것으로 취급) */
+  handleBack(): boolean {
+    if (this.fade) return true;
+    return this.current?.onBack() ?? false;
+  }
+
   private applyQueue(): void {
     while (this.queue.length > 0) {
       const op = this.queue.shift()!;

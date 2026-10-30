@@ -19,6 +19,24 @@ export const KEY_BINDINGS: Record<Action, readonly string[]> = {
   action: ['Space', 'ShiftLeft', 'ShiftRight', 'KeyJ', 'KeyZ'],
 };
 
+/**
+ * 게임패드(표준 배치) 버튼 번호 → 행동.
+ * 0=A(아래) 1=B(오른쪽) 2=X(왼쪽) 3=Y(위) 9=Start 12~15=십자키 위·아래·왼쪽·오른쪽. 왼쪽 스틱은 이동에 자동 연결.
+ */
+export const GAMEPAD_BINDINGS: Record<Action, readonly number[]> = {
+  up: [12],
+  down: [13],
+  left: [14],
+  right: [15],
+  confirm: [0],
+  pause: [9],
+  action: [0, 2],
+};
+
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
+const ACTIONS = Object.keys(KEY_BINDINGS) as Action[];
+const DIRECTIONS: readonly Direction[] = ['up', 'down', 'left', 'right'];
 const BOUND_KEYS = new Set(Object.values(KEY_BINDINGS).flat());
 
 export type PointerKind = 'mouse' | 'touch' | 'pen';
@@ -57,8 +75,21 @@ export interface Tap {
   pointer: GamePointer;
 }
 
+/** 빠르게 쓸어 넘긴 동작 (터치 스와이프 = 마우스 드래그 휙) */
+export interface Swipe {
+  dir: Direction;
+  /** 이동량 (논리 단위) */
+  dx: number;
+  dy: number;
+  pointer: GamePointer;
+}
+
 const TAP_MAX_MS = 350;
 const TAP_MAX_DIST = 28; // 논리 단위
+const SWIPE_MIN_DIST = 60;
+const SWIPE_MAX_MS = 600;
+const STICK_DEADZONE = 0.25;
+const STICK_AS_BUTTON = 0.6; // 스틱을 이만큼 기울이면 방향 버튼으로도 취급 (메뉴 이동용)
 /** 화면 전환 중처럼 입력을 막아야 할 때 포인터를 이 주인에게 줘서 아무도 못 쓰게 함 */
 const SYSTEM_OWNER = Object.freeze({ name: 'system' });
 
@@ -66,8 +97,10 @@ const SYSTEM_OWNER = Object.freeze({ name: 'system' });
  * 통합 입력 매니저 — 터치 / 마우스 / 펜 / 키보드를 한 가지 방식으로 읽습니다.
  *
  * 사용법 (씬의 update 안에서):
- *   const move = input.getMoveVector();        // 방향키·WASD + 가상 조이스틱 (길이 0~1)
- *   if (input.wasPressed('action')) dash();    // Space키 또는 화면의 액션 버튼
+ *   const move = input.getMoveVector();        // 방향키·WASD + 가상 조이스틱 + 게임패드 스틱 (길이 0~1)
+ *   if (input.wasPressed('action')) dash();    // Space키 / 화면의 액션 버튼 / 게임패드 A
+ *   if (input.wasPressedOrTouched()) jump();   // 원버튼 게임: 화면 아무 곳 터치 또는 Space
+ *   const dir = input.getDirectionPressed();   // 스와이프 또는 방향키 (2048·러너 등)
  *   for (const p of input.pointers.values()) { ... } // 멀티터치 직접 처리
  *
  * 프레임 규칙: 이벤트는 쌓아 두었다가, 프레임 끝(endFrame)에 '이번 프레임' 표시를 지웁니다.
@@ -77,10 +110,14 @@ export class InputManager {
   readonly pointers = new Map<number, GamePointer>();
   /** 이번 프레임에 완료된 탭 */
   readonly taps: Tap[] = [];
+  /** 이번 프레임에 완료된 스와이프 */
+  readonly swipes: Swipe[] = [];
   /** 마우스 커서 위치 (PC 호버용). 터치에서는 null */
   mouse: Vec2 | null = null;
-  /** 마지막으로 쓴 입력 종류. 'keyboard'면 버튼에 포커스 테두리를 보여 줌 */
+  /** 마지막으로 쓴 입력 종류. 'keyboard'(게임패드 포함)면 버튼에 포커스 테두리를 보여 줌 */
   lastDevice: 'pointer' | 'keyboard' = 'pointer';
+  /** 게임패드가 연결되어 있는지 */
+  gamepadConnected = false;
   /** 주 입력이 손가락인 기기인지 (안내 문구 분기용) */
   readonly isTouchDevice: boolean;
 
@@ -91,6 +128,13 @@ export class InputManager {
   private readonly virtualPressed = new Set<Action>();
   private analogX = 0;
   private analogY = 0;
+  private padButtons = new Set<Action>();
+  private readonly padStick = new Set<Action>();
+  private padAllPrev = new Set<Action>();
+  private padAll = new Set<Action>();
+  private readonly padPressed = new Set<Action>();
+  private padX = 0;
+  private padY = 0;
   private suppressed = false;
   private wantPointerCursor = false;
   private cursorIsPointer = false;
@@ -117,19 +161,48 @@ export class InputManager {
 
   // ───────────────────────── 조회 API ─────────────────────────
 
-  /** 행동 버튼을 누르고 있는지 (키보드 또는 화면 버튼) */
+  /** 행동 버튼을 누르고 있는지 (키보드 / 화면 버튼 / 게임패드) */
   isDown(action: Action): boolean {
-    if (this.virtualHeld.has(action)) return true;
-    for (const code of KEY_BINDINGS[action]) if (this.keysDown.has(code)) return true;
-    return false;
+    return this.digitalDown(action) || this.padStick.has(action);
   }
 
   /** 이번 프레임에 막 눌렀는지 (한 번만 true) */
   wasPressed(action: Action): boolean {
     if (this.suppressed) return false;
-    if (this.virtualPressed.has(action)) return true;
+    if (this.virtualPressed.has(action) || this.padPressed.has(action)) return true;
     for (const code of KEY_BINDINGS[action]) if (this.keysPressed.has(code)) return true;
     return false;
+  }
+
+  /**
+   * 원버튼 게임용: 이번 프레임에 '화면 아무 곳 터치(버튼 위 제외)' 또는 '행동 키'를 눌렀는지.
+   * UI 버튼 update 다음에 호출해야 버튼을 누른 터치가 섞이지 않습니다.
+   */
+  wasPressedOrTouched(action: Action = 'action'): boolean {
+    return this.wasPressed(action) || this.getNewPointer() !== null;
+  }
+
+  /**
+   * 이번 프레임에 새로 닿은, 아직 주인이 없는 손가락(또는 마우스 클릭). 없으면 null.
+   * @param claimFor 넘기면 그 객체가 이 손가락을 가져감 (다른 UI가 무시)
+   */
+  getNewPointer(claimFor?: object): GamePointer | null {
+    if (this.suppressed) return null;
+    for (const p of this.pointers.values()) {
+      if (p.justDown && p.owner === null) {
+        if (claimFor) p.owner = claimFor;
+        return p;
+      }
+    }
+    return null;
+  }
+
+  /** 이번 프레임의 방향 입력: 스와이프(버튼 위 제외) 또는 방향키·WASD·십자키. 없으면 null */
+  getDirectionPressed(): Direction | null {
+    if (this.suppressed) return null;
+    for (const s of this.swipes) if (s.pointer.owner === null) return s.dir;
+    for (const d of DIRECTIONS) if (this.wasPressed(d)) return d;
+    return null;
   }
 
   /** 키를 직접 확인 (KeyboardEvent.code, 예: 'KeyR') */
@@ -146,14 +219,14 @@ export class InputManager {
    * 방향키·WASD + 가상 조이스틱을 합친 값이라 폰/PC 코드가 똑같습니다.
    */
   getMoveVector(out: Vec2 = { x: 0, y: 0 }): Vec2 {
-    let x = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
-    let y = (this.isDown('down') ? 1 : 0) - (this.isDown('up') ? 1 : 0);
+    let x = (this.digitalDown('right') ? 1 : 0) - (this.digitalDown('left') ? 1 : 0);
+    let y = (this.digitalDown('down') ? 1 : 0) - (this.digitalDown('up') ? 1 : 0);
     if (x !== 0 && y !== 0) {
       x *= Math.SQRT1_2;
       y *= Math.SQRT1_2;
     }
-    x += this.analogX;
-    y += this.analogY;
+    x += this.analogX + this.padX;
+    y += this.analogY + this.padY;
     const len = Math.hypot(x, y);
     if (len > 1) {
       x /= len;
@@ -162,6 +235,13 @@ export class InputManager {
     out.x = x;
     out.y = y;
     return out;
+  }
+
+  /** 키보드 + 화면 버튼 + 게임패드 버튼·십자키 (스틱 제외 — 스틱은 getMoveVector에서 아날로그로 더함) */
+  private digitalDown(action: Action): boolean {
+    if (this.virtualHeld.has(action) || this.padButtons.has(action)) return true;
+    for (const code of KEY_BINDINGS[action]) if (this.keysDown.has(code)) return true;
+    return false;
   }
 
   // ─────────────── 가상 컨트롤(화면 버튼·조이스틱)용 API ───────────────
@@ -196,7 +276,60 @@ export class InputManager {
     for (const p of this.pointers.values()) if (p.justDown && p.owner === null) p.owner = SYSTEM_OWNER;
     this.keysPressed.clear();
     this.virtualPressed.clear();
+    this.padPressed.clear();
     this.taps.length = 0;
+    this.swipes.length = 0;
+  }
+
+  /** Game 루프가 매 프레임 처음에 호출: 게임패드 상태 읽기 */
+  pollGamepads(): void {
+    const prev = this.padAllPrev;
+    this.padAllPrev = this.padAll;
+    this.padAll = prev;
+    this.padAll.clear();
+    this.padButtons.clear();
+    this.padStick.clear();
+    this.padX = 0;
+    this.padY = 0;
+
+    let pad: Gamepad | null = null;
+    try {
+      for (const p of navigator.getGamepads?.() ?? []) {
+        if (p && p.connected) {
+          pad = p;
+          break;
+        }
+      }
+    } catch {
+      pad = null; // 보안 정책(http 등)으로 막힌 경우
+    }
+    this.gamepadConnected = pad !== null;
+    if (!pad) return;
+
+    for (const action of ACTIONS) {
+      for (const index of GAMEPAD_BINDINGS[action]) if (pad.buttons[index]?.pressed) this.padButtons.add(action);
+    }
+    const ax = pad.axes[0] ?? 0;
+    const ay = pad.axes[1] ?? 0;
+    const mag = Math.hypot(ax, ay);
+    if (mag > STICK_DEADZONE) {
+      const k = Math.min(1, (mag - STICK_DEADZONE) / (1 - STICK_DEADZONE)) / mag;
+      this.padX = ax * k;
+      this.padY = ay * k;
+    }
+    if (ax <= -STICK_AS_BUTTON) this.padStick.add('left');
+    if (ax >= STICK_AS_BUTTON) this.padStick.add('right');
+    if (ay <= -STICK_AS_BUTTON) this.padStick.add('up');
+    if (ay >= STICK_AS_BUTTON) this.padStick.add('down');
+
+    for (const a of this.padButtons) this.padAll.add(a);
+    for (const a of this.padStick) this.padAll.add(a);
+    for (const a of this.padAll) {
+      if (!this.padAllPrev.has(a)) {
+        this.padPressed.add(a);
+        this.lastDevice = 'keyboard';
+      }
+    }
   }
 
   /** 모든 입력을 뗀 상태로 (앱이 백그라운드로 갈 때 등) */
@@ -221,11 +354,13 @@ export class InputManager {
     }
     this.keysPressed.clear();
     this.virtualPressed.clear();
+    this.padPressed.clear();
     const prev = this.virtualHeldPrev;
     this.virtualHeldPrev = this.virtualHeld;
     this.virtualHeld = prev;
     this.virtualHeld.clear();
     this.taps.length = 0;
+    this.swipes.length = 0;
     this.analogX = 0;
     this.analogY = 0;
     this.suppressed = false;
@@ -296,9 +431,15 @@ export class InputManager {
     p.y = this.view.toLogicalY(e.clientY);
     p.isDown = false;
     p.justUp = true;
-    const quick = performance.now() - p.startTime <= TAP_MAX_MS;
-    const still = Math.hypot(p.x - p.startX, p.y - p.startY) <= TAP_MAX_DIST;
-    if (quick && still) this.taps.push({ x: p.x, y: p.y, pointer: p });
+    const elapsed = performance.now() - p.startTime;
+    const dx = p.x - p.startX;
+    const dy = p.y - p.startY;
+    const dist = Math.hypot(dx, dy);
+    if (elapsed <= TAP_MAX_MS && dist <= TAP_MAX_DIST) this.taps.push({ x: p.x, y: p.y, pointer: p });
+    if (elapsed <= SWIPE_MAX_MS && dist >= SWIPE_MIN_DIST) {
+      const dir: Direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
+      this.swipes.push({ dir, dx, dy, pointer: p });
+    }
   };
 
   private onPointerCancel = (e: PointerEvent): void => {

@@ -2,7 +2,17 @@ import { TAU } from '../utils/math';
 import { polygonPath, strokeNeon } from './neon';
 
 /** 이미지 없이 선으로 그리는 아이콘 */
-export type IconName = 'pause' | 'play' | 'sound-on' | 'sound-off' | 'home' | 'retry' | 'install' | 'heart' | 'gem';
+export type IconName =
+  | 'pause'
+  | 'play'
+  | 'sound-on'
+  | 'sound-off'
+  | 'home'
+  | 'retry'
+  | 'install'
+  | 'heart'
+  | 'gem'
+  | 'settings';
 
 /** (x, y) 중심, size = 아이콘 한 변 길이 */
 export function drawIcon(
@@ -100,6 +110,23 @@ export function drawIcon(
       polygonPath(ctx, x, y, s * 0.8, 4, -TAU / 4);
       strokeNeon(ctx, color, w);
       break;
+    case 'settings': {
+      // 톱니바퀴: 8개의 톱니 + 가운데 구멍
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU;
+        ctx.moveTo(x + Math.cos(a) * s * 0.5, y + Math.sin(a) * s * 0.5);
+        ctx.lineTo(x + Math.cos(a) * s * 0.78, y + Math.sin(a) * s * 0.78);
+      }
+      strokeNeon(ctx, color, w * 1.2);
+      ctx.beginPath();
+      ctx.arc(x, y, s * 0.5, 0, TAU);
+      strokeNeon(ctx, color, w);
+      ctx.beginPath();
+      ctx.arc(x, y, s * 0.2, 0, TAU);
+      strokeNeon(ctx, color, w * 0.8);
+      break;
+    }
   }
   ctx.restore();
 }

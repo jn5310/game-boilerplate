@@ -78,18 +78,31 @@ export class GameScene extends Scene {
     this.hud.setCoins(this.game.save.data.coins);
     this.hud.setHp(this.player.hp, this.player.maxHp);
     this.game.audio.play('start');
+    this.game.wakeLock.set(true); // 게임 중에는 화면이 꺼지지 않게
   }
 
   override onExit(): void {
     this.game.background.scrollSpeed = 24;
+    this.game.wakeLock.set(false);
+  }
+
+  override onPause(): void {
+    this.game.wakeLock.set(false);
   }
 
   override onResume(): void {
     this.pauseQueued = false;
+    this.game.wakeLock.set(true);
   }
 
   override onAppHidden(): void {
     this.openPause(); // 전화가 오거나 앱을 내리면 자동 일시정지
+  }
+
+  /** 안드로이드 뒤로가기 = 일시정지 (게임이 꺼지지 않게) */
+  override onBack(): boolean {
+    this.openPause();
+    return true;
   }
 
   override onResize(width: number, height: number): void {
@@ -108,6 +121,7 @@ export class GameScene extends Scene {
   }
 
   update(dt: number): void {
+    this.shake.enabled = this.game.save.data.settings.screenShake;
     // 순서 중요: 버튼 → 조이스틱 → 게임 로직 (버튼을 누른 손가락은 조이스틱이 무시)
     this.ui.update(dt);
     this.joystick.update(dt);
@@ -210,6 +224,7 @@ export class GameScene extends Scene {
         this.particles.burst(e.x, e.y, e.color, 1);
         this.particles.burst(p.x, p.y, COLORS.cyan, 0.6);
         this.game.audio.play('hit');
+        this.game.haptics.vibrate(70);
         this.shake.add(0.65);
         this.hitStop = 0.07;
         this.damageFlash = 1;
@@ -266,6 +281,7 @@ export class GameScene extends Scene {
     this.shake.add(1);
     this.game.audio.play('explode');
     this.game.audio.play('gameover');
+    this.game.haptics.vibrate([90, 60, 180]);
   }
 
   private finish(): void {
@@ -330,9 +346,15 @@ export class GameScene extends Scene {
     const t = this.elapsed;
     if (t > 5 || this.gameOverTime >= 0) return;
     const alpha = t < 4 ? 1 : 5 - t;
-    const touch = this.game.input.isTouchDevice;
-    const line1 = touch ? '드래그해서 이동' : '방향키 / WASD (또는 마우스 드래그)로 이동';
-    const line2 = touch ? 'DASH = 무적 돌진 · 적을 부술 수 있어요' : 'Space = 무적 대시 · 적을 부술 수 있어요';
+    const input = this.game.input;
+    const touch = input.isTouchDevice;
+    const pad = input.gamepadConnected;
+    const line1 = pad ? '왼쪽 스틱 / 십자키로 이동' : touch ? '드래그해서 이동' : '방향키 / WASD (또는 마우스 드래그)로 이동';
+    const line2 = pad
+      ? 'A = 무적 대시 · 적을 부술 수 있어요'
+      : touch
+        ? 'DASH = 무적 돌진 · 적을 부술 수 있어요'
+        : 'Space = 무적 대시 · 적을 부술 수 있어요';
     plainText(ctx, line1, w / 2, h * 0.3, 28, COLORS.text, { alpha, weight: 700 });
     plainText(ctx, line2, w / 2, h * 0.3 + 40, 22, COLORS.textDim, { alpha, weight: 600 });
   }

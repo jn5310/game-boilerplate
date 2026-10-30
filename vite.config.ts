@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   // 상대 경로로 빌드 → GitHub Pages(https://아이디.github.io/저장소이름/), Vercel, 아무 폴더에서나 그대로 동작
   base: './',
+  // VITE_로 시작하는 환경 변수 + Vercel이 넣어 주는 커밋 SHA를 앱에서 읽을 수 있게 (src/core/build.ts)
+  envPrefix: ['VITE_', 'VERCEL_GIT_COMMIT_SHA'],
   server: {
     // 같은 Wi-Fi에 있는 스마트폰에서 http://PC의IP:5173 으로 접속 가능
     host: true,

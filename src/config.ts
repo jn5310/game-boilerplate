@@ -31,7 +31,22 @@ export const CONFIG = {
 
   /** 에러를 화면에 빨간 박스로 표시 (폰에는 개발자 도구가 없으니까!) */
   showErrorOverlay: true,
+
+  /**
+   * 화면 방향. 'portrait'(세로 전용) 또는 'landscape'(가로 전용)로 바꾸면,
+   * 반대로 돌렸을 때 "화면을 돌려 주세요" 안내가 뜨고 게임이 멈춥니다.
+   * ⚠ public/manifest.json의 "orientation"도 같은 값으로 바꾸세요 (설치된 앱의 화면 고정).
+   */
+  orientation: 'any' as OrientationMode,
+
+  /** 안드로이드 뒤로가기 / 브라우저 뒤로 버튼을 누르면 게임을 끄는 대신 씬의 onBack 실행 (게임 중이면 일시정지) */
+  backButtonPause: true,
+
+  /** 게임 중에 화면이 저절로 꺼지지 않게 (지원하는 브라우저에서만 동작) */
+  keepScreenOn: true,
 } as const;
+
+export type OrientationMode = 'any' | 'portrait' | 'landscape';
 
 /** 네온 팔레트 */
 export const COLORS = {

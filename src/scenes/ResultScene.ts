@@ -44,6 +44,12 @@ export class ResultScene extends Scene {
     );
   }
 
+  /** 뒤로가기 = 타이틀로 */
+  override onBack(): boolean {
+    this.game.scenes.change(new TitleScene(this.game));
+    return true;
+  }
+
   override onResize(width: number, height: number): void {
     const safe = this.game.view.safe;
     const top = safe.top;
