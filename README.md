@@ -3,8 +3,9 @@
 TypeScript + Vite + HTML5 Canvas로 만든 **모바일 퍼스트 2D 게임 시작 템플릿**입니다.
 복사해서 바로 새 게임을 만들 수 있고, 이미지·오디오 파일이 하나도 없어도 동작합니다.
 
-> 처음이라면 **[MOBILE_VIBE_GUIDE.md](./MOBILE_VIBE_GUIDE.md)** 부터 읽어 보세요.
-> (폰에서 실행하는 법, 배포하는 법, 다음 게임을 만드는 프롬프트가 들어 있습니다.)
+> **새 게임을 바로 만들려면 [HANDOFF.md](./HANDOFF.md)** (인수인계 문서: 현재 상태, 단계별 순서, 복사용 프롬프트, 엔진 치트시트)
+>
+> 자세한 사용법·배포법·FAQ는 **[MOBILE_VIBE_GUIDE.md](./MOBILE_VIBE_GUIDE.md)** 에 있습니다.
 
 ## 들어 있는 것
 
