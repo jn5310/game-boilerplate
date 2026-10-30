@@ -37,6 +37,14 @@ export abstract class Scene {
   /** 앱이 백그라운드로 가거나 창이 포커스를 잃을 때 (게임 씬이면 자동 일시정지에 사용) */
   onAppHidden(): void {}
 
+  /**
+   * 안드로이드 뒤로가기 / 브라우저 뒤로 버튼 (CONFIG.backButtonPause).
+   * 처리했으면 true (예: 일시정지 열기, 팝업 닫기), false면 브라우저가 원래대로 페이지를 떠남 (타이틀 화면 등).
+   */
+  onBack(): boolean {
+    return false;
+  }
+
   abstract update(dt: number): void;
 
   abstract render(ctx: CanvasRenderingContext2D): void;

@@ -5,6 +5,7 @@ import { neonText, roundRectPath, strokeNeon, withAlpha } from '../gfx/neon';
 import { Button } from '../ui/Button';
 import { UILayer } from '../ui/UILayer';
 import { easeOutBack } from '../utils/math';
+import { SettingsScene } from './SettingsScene';
 import { TitleScene } from './TitleScene';
 
 /** 일시정지 팝업 — 아래의 게임 화면은 멈춘 채로 보입니다 (isOverlay = true) */
@@ -13,7 +14,7 @@ export class PauseScene extends Scene {
 
   private readonly ui = new UILayer(this.game);
   private readonly resumeButton: Button;
-  private readonly soundButton: Button;
+  private readonly settingsButton: Button;
   private readonly quitButton: Button;
   private t = 0;
   private panel = { x: 0, y: 0, w: 0, h: 0 };
@@ -23,19 +24,24 @@ export class PauseScene extends Scene {
     this.resumeButton = this.ui.add(
       new Button(game, { label: '계속하기', icon: 'play', color: COLORS.cyan, hotkey: 'pause', onClick: () => game.scenes.pop() }),
     );
-    this.soundButton = this.ui.add(
+    this.settingsButton = this.ui.add(
       new Button(game, {
+        label: '설정',
+        icon: 'settings',
         color: COLORS.yellow,
-        onClick: () => {
-          game.toggleSound();
-          this.refreshSoundLabel();
-        },
+        // 게임 도중에는 데이터 초기화를 숨김 (진행 중인 점수·코인과 꼬이지 않게)
+        onClick: () => game.scenes.push(new SettingsScene(game, { allowReset: false })),
       }),
     );
     this.quitButton = this.ui.add(
       new Button(game, { label: '타이틀로', icon: 'home', color: COLORS.magenta, onClick: () => game.scenes.change(new TitleScene(game)) }),
     );
-    this.refreshSoundLabel();
+  }
+
+  /** 뒤로가기 = 계속하기 */
+  override onBack(): boolean {
+    this.game.scenes.pop();
+    return true;
   }
 
   override onResize(width: number, height: number): void {
@@ -46,7 +52,7 @@ export class PauseScene extends Scene {
     this.panel = { x: (width - w) / 2, y: (height - h) / 2, w, h };
     const bw = w - 72;
     let y = this.panel.y + 130;
-    for (const b of [this.resumeButton, this.soundButton, this.quitButton]) {
+    for (const b of [this.resumeButton, this.settingsButton, this.quitButton]) {
       b.setRect(this.panel.x + 36, y, bw, buttonH);
       y += buttonH + gap;
     }
@@ -82,9 +88,4 @@ export class PauseScene extends Scene {
     ctx.restore();
   }
 
-  private refreshSoundLabel(): void {
-    const on = this.game.save.data.settings.soundEnabled;
-    this.soundButton.label = on ? '사운드 켜짐' : '사운드 꺼짐';
-    this.soundButton.icon = on ? 'sound-on' : 'sound-off';
-  }
 }

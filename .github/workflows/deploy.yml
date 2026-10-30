@@ -33,6 +33,10 @@ jobs:
 
       - name: Build (타입 검사 + 번들 + 서비스 워커)
         run: npm run build
+        env:
+          # 타이틀 화면 오른쪽 아래에 "#실행번호 · 커밋" 표시 → 폰에서 새 버전인지 바로 확인
+          VITE_BUILD_NUMBER: ${{ github.run_number }}
+          VITE_APP_VERSION: ${{ github.sha }}
 
       - uses: actions/configure-pages@v5
 

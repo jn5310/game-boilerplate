@@ -1,4 +1,5 @@
 import { COLORS, CONFIG } from '../config';
+import { BUILD_LABEL } from '../core/build';
 import type { Game } from '../core/Game';
 import { pwa } from '../core/pwa';
 import { Scene } from '../core/Scene';
@@ -8,6 +9,7 @@ import { Button } from '../ui/Button';
 import { UILayer } from '../ui/UILayer';
 import { easeOutBack, rand, TAU } from '../utils/math';
 import { GameScene } from './GameScene';
+import { SettingsScene } from './SettingsScene';
 
 interface Orbiter {
   angle: number;
@@ -22,7 +24,7 @@ interface Orbiter {
 export class TitleScene extends Scene {
   private readonly ui = new UILayer(this.game);
   private readonly startButton: Button;
-  private readonly soundButton: Button;
+  private readonly settingsButton: Button;
   private readonly installButton: Button;
   private readonly orbiters: Orbiter[];
   private t = 0;
@@ -35,13 +37,12 @@ export class TitleScene extends Scene {
     this.startButton = this.ui.add(
       new Button(game, { label: '게임 시작', icon: 'play', color: COLORS.cyan, onClick: () => game.scenes.change(new GameScene(game)) }),
     );
-    this.soundButton = this.ui.add(
+    this.settingsButton = this.ui.add(
       new Button(game, {
+        label: '설정',
+        icon: 'settings',
         color: COLORS.yellow,
-        onClick: () => {
-          game.toggleSound();
-          this.refreshSoundLabel();
-        },
+        onClick: () => game.scenes.push(new SettingsScene(game)),
       }),
     );
     this.installButton = this.ui.add(
@@ -55,7 +56,6 @@ export class TitleScene extends Scene {
       }),
     );
     this.installButton.visible = pwa.canInstall;
-    this.refreshSoundLabel();
 
     const colors = [COLORS.cyan, COLORS.magenta, COLORS.yellow, COLORS.orange, COLORS.purple];
     this.orbiters = Array.from({ length: 7 }, (_, i) => ({
@@ -93,15 +93,15 @@ export class TitleScene extends Scene {
       const y = top + usable * 0.53 + 100 / 2 + 24 + 84 / 2;
       if (this.installButton.visible) {
         const small = (bw - 20) / 2;
-        this.soundButton.setCenter(width / 2 - small / 2 - 10, y, small, 84);
+        this.settingsButton.setCenter(width / 2 - small / 2 - 10, y, small, 84);
         this.installButton.setCenter(width / 2 + small / 2 + 10, y, small, 84);
       } else {
-        this.soundButton.setCenter(width / 2, y, (bw - 20) / 2, 84);
+        this.settingsButton.setCenter(width / 2, y, (bw - 20) / 2, 84);
       }
     } else {
       this.startButton.setCenter(width / 2, top + usable * 0.52, bw, 104);
-      this.soundButton.setCenter(width / 2, this.startButton.centerY + 104 / 2 + 26 + 88 / 2, bw, 88);
-      this.installButton.setCenter(width / 2, this.soundButton.centerY + 88 + 22, bw, 88);
+      this.settingsButton.setCenter(width / 2, this.startButton.centerY + 104 / 2 + 26 + 88 / 2, bw, 88);
+      this.installButton.setCenter(width / 2, this.settingsButton.centerY + 88 + 22, bw, 88);
     }
   }
 
@@ -149,8 +149,13 @@ export class TitleScene extends Scene {
     const lines: Array<[string, string]> = [];
     if (!this.game.save.isPersistent) lines.push(['⚠ 이 브라우저에서는 기록이 저장되지 않아요 (시크릿 모드?)', COLORS.red]);
     if (pwa.isIOS && !pwa.isStandalone) lines.push(['아이폰: 공유 버튼 → "홈 화면에 추가"로 앱처럼 설치', COLORS.green]);
+    const input = this.game.input;
     lines.push([
-      this.game.input.isTouchDevice ? '드래그 = 이동 · DASH 버튼 = 대시' : '방향키/WASD = 이동 · Space = 대시 · Esc = 일시정지',
+      input.gamepadConnected
+        ? '게임패드: 스틱 = 이동 · A = 대시 · Start = 일시정지'
+        : input.isTouchDevice
+          ? '드래그 = 이동 · DASH 버튼 = 대시'
+          : '방향키/WASD = 이동 · Space = 대시 · Esc = 일시정지',
       COLORS.textDim,
     ]);
     let y = this.footerY;
@@ -158,11 +163,14 @@ export class TitleScene extends Scene {
       plainText(ctx, lines[i][0], cx, y, 20, lines[i][1], { weight: 600 });
       y -= 30;
     }
+
+    // 빌드 번호: 폰에서 새 버전이 반영됐는지 확인용 (배포할 때마다 바뀜)
+    const { width, height, safe } = this.game.view;
+    plainText(ctx, BUILD_LABEL, width - safe.right - 16, height - safe.bottom - 14, 16, COLORS.textDim, {
+      align: 'right',
+      weight: 600,
+      alpha: 0.7,
+    });
   }
 
-  private refreshSoundLabel(): void {
-    const on = this.game.save.data.settings.soundEnabled;
-    this.soundButton.label = on ? '사운드 ON' : '사운드 OFF';
-    this.soundButton.icon = on ? 'sound-on' : 'sound-off';
-  }
 }

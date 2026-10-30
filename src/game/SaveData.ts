@@ -24,6 +24,10 @@ export interface SaveData {
     soundEnabled: boolean;
     /** 효과음 볼륨 0~1 */
     volume: number;
+    /** 진동 피드백 (지원 기기만) */
+    vibration: boolean;
+    /** 화면 흔들림 (멀미가 나면 끌 수 있게) */
+    screenShake: boolean;
   };
   stats: {
     /** 플레이 횟수 */
@@ -44,6 +48,8 @@ export const DEFAULT_SAVE: SaveData = {
   settings: {
     soundEnabled: true,
     volume: 0.8,
+    vibration: true,
+    screenShake: true,
   },
   stats: {
     gamesPlayed: 0,

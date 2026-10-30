@@ -1,0 +1,26 @@
+# Pull Request를 올리면 머지하기 전에 타입 검사 + 빌드가 되는지 자동으로 확인합니다.
+# (AI가 PR로 작업을 올렸을 때, 머지 전에 빨간 X/초록 체크로 바로 알 수 있음. 배포는 하지 않음)
+name: Build check
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build (타입 검사 + 번들 + 서비스 워커)
+        run: npm run build

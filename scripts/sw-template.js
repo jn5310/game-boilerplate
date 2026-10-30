@@ -32,9 +32,11 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // 페이지(HTML): 인터넷 우선 → 새 버전을 바로 받음. 오프라인이면 저장된 것 사용
+  // cache: 'no-cache' = 브라우저 캐시가 있어도 서버에 바뀌었는지 꼭 확인 (배포 직후에도 새 버전)
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
+        .catch(() => fetch(request))
         .then((response) => {
           if (response.ok) {
             const copy = response.clone();

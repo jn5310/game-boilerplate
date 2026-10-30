@@ -14,6 +14,8 @@ export class ScreenShake {
   maxAngle = 0.04;
   /** 초당 줄어드는 양 */
   decay = 1.6;
+  /** false면 흔들리지 않음 (설정의 '화면 흔들림'과 연결) */
+  enabled = true;
 
   private trauma = 0;
   private time = 0;
@@ -22,6 +24,7 @@ export class ScreenShake {
   private angle = 0;
 
   add(amount: number): void {
+    if (!this.enabled) return;
     this.trauma = Math.min(1, this.trauma + amount);
   }
 
@@ -39,7 +42,7 @@ export class ScreenShake {
   }
 
   apply(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    if (this.trauma <= 0) return;
+    if (this.trauma <= 0 || !this.enabled) return;
     ctx.translate(width / 2 + this.offsetX, height / 2 + this.offsetY);
     ctx.rotate(this.angle);
     ctx.translate(-width / 2, -height / 2);
