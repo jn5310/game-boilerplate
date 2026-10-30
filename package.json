@@ -1,0 +1,21 @@
+{
+  "name": "mobile-game-boilerplate",
+  "private": true,
+  "version": "1.0.0",
+  "description": "모바일 퍼스트 2D 게임 보일러플레이트 (TypeScript + Vite + HTML5 Canvas, 에셋 0개)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/build-sw.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.0",
+    "vite": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

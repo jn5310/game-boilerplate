@@ -1,0 +1,57 @@
+/* 모바일 브라우저의 스크롤·바운스·확대·텍스트 선택·탭 하이라이트를 전부 끕니다 */
+:root {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #05050f;
+  overscroll-behavior: none; /* 당겨서 새로고침·바운스 방지 */
+  touch-action: none; /* 브라우저 기본 제스처(스크롤/핀치/더블탭 확대) 끄기 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none; /* iOS 길게 누르기 메뉴 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+/* 캔버스를 감싸는 컨테이너: 실제 보이는 화면 크기를 정확히 따라감 (iOS 100vh 문제 회피) */
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+}
+
+noscript {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #e8f7ff;
+  font: 16px system-ui, sans-serif;
+}
